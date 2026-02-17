@@ -106,9 +106,46 @@ class UserWebcamPlayer:
         # You have to use your saved model, use resized img as input, and get one classification value out of it
         # The classification value should be 0, 1, or 2 for neutral, happy or surprise respectively
 
-        # return an integer (0, 1 or 2), otherwise the code will throw an error
-        return 1
-        pass
+        import os
+        import glob
+
+        if not hasattr(self, '_emotion_model') or self._emotion_model is None:
+            base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+            results_dir = os.path.join(base_dir, 'results')
+            if not os.path.isdir(results_dir):
+                raise FileNotFoundError('results directory not found: {}'.format(results_dir))
+
+            candidate_patterns = [
+                'step6_best_model_*.keras',
+                '*.keras',
+            ]
+            candidates = []
+            for pattern in candidate_patterns:
+                candidates.extend(glob.glob(os.path.join(results_dir, pattern)))
+
+            if not candidates:
+                raise FileNotFoundError('No .keras model found in {}'.format(results_dir))
+
+            candidates = sorted(set(candidates), key=os.path.getmtime, reverse=True)
+            model_path = candidates[0]
+            self._emotion_model = models.load_model(model_path)
+
+        model = self._emotion_model
+
+        if img is None:
+            raise ValueError('Input image from webcam is empty')
+
+        img_array = np.asarray(img, dtype=np.float32)
+        if img_array.ndim != 2:
+            raise ValueError('Expected grayscale image with shape NxN, got {}'.format(img_array.shape))
+
+        resized = tf.image.resize(img_array[..., np.newaxis], image_size).numpy()
+        rgb_image = np.repeat(resized, 3, axis=-1)
+        batch = np.expand_dims(rgb_image, axis=0)
+
+        prediction = model.predict(batch, verbose=0)
+        emotion = int(np.argmax(prediction[0]))
+        return emotion
     
     def get_move(self, board_state):
         row, col = None, None

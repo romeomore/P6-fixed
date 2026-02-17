@@ -20,6 +20,7 @@ class BasicModel(Model):
             layers.MaxPooling2D(pool_size=(2,2)),
 
             layers.Flatten(),
+            layers.Dropout(0.6),
             layers.Dense(8, activation='relu'),
             layers.Dense(categories_count, activation='softmax')
         ])

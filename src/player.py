@@ -2,6 +2,7 @@ from config import BOARD_SIZE, categories, image_size
 from tensorflow.keras import models
 import numpy as np
 import tensorflow as tf
+from pathlib import Path
 
 class TicTacToePlayer:
     def get_move(self, board_state):
@@ -106,9 +107,48 @@ class UserWebcamPlayer:
         # You have to use your saved model, use resized img as input, and get one classification value out of it
         # The classification value should be 0, 1, or 2 for neutral, happy or surprise respectively
 
-        # return an integer (0, 1 or 2), otherwise the code will throw an error
-        return 1
-        pass
+        if not hasattr(self, '_emotion_model'):
+            src_dir = Path(__file__).resolve().parent
+            project_dir = src_dir.parent
+            search_dirs = [
+                src_dir / 'results',
+                project_dir / 'results',
+                src_dir,
+                project_dir
+            ]
+
+            model_candidates = []
+            for directory in search_dirs:
+                if directory.exists():
+                    model_candidates.extend(directory.glob('*.keras'))
+
+            if len(model_candidates) == 0:
+                raise FileNotFoundError(
+                    'No .keras model file found. Train and save a model first (e.g., in a results folder).'
+                )
+
+            model_path = max(model_candidates, key=lambda path: path.stat().st_mtime)
+            self._emotion_model = models.load_model(str(model_path))
+
+        image = np.asarray(img, dtype=np.float32)
+        if image.ndim != 2:
+            raise ValueError('Expected a grayscale square image of shape NxN.')
+
+        image = tf.convert_to_tensor(image)
+        image = tf.expand_dims(image, axis=-1)
+        image = tf.image.resize(image, image_size)
+        image = tf.image.grayscale_to_rgb(image)
+        image = tf.expand_dims(image, axis=0)
+
+        prediction = self._emotion_model.predict(image, verbose=0)
+        prediction_index = int(np.argmax(prediction[0]))
+
+        if prediction_index not in range(len(categories)):
+            raise ValueError(f'Predicted invalid class index: {prediction_index}')
+
+        train_class_order = sorted(categories)
+        predicted_label = train_class_order[prediction_index]
+        return int(categories.index(predicted_label))
     
     def get_move(self, board_state):
         row, col = None, None

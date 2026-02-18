@@ -137,6 +137,11 @@ class UserWebcamPlayer:
         image = tf.convert_to_tensor(image)
         image = tf.expand_dims(image, axis=-1)
         image = tf.image.resize(image, image_size)
+        resized_gray = tf.squeeze(image, axis=-1).numpy()
+        plt.imshow(resized_gray, cmap='gray', vmin=0, vmax=255)
+        plt.title('Resized input sent to model')
+        plt.axis('off')
+        plt.show()
         image = tf.image.grayscale_to_rgb(image)
         image = tf.expand_dims(image, axis=0)
 
